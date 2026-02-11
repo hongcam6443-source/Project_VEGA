@@ -209,6 +209,7 @@ RunSyscall:
 
 ps:
 目前Halo‘s Gate 主题还有两个方向需要完善：
+
 1.整合一个完整的初级恶意脚本，展示Halo’s Gate在具体的恶意功能实现中的调用逻辑
 2.**Indirect Syscalls (间接系统调用升级)**：
 - 目前的 `syscall` 指令是在我们自己的 `.exe` 里执行的。聪明的 EDR 会检查 `RIP` 指针，发现这个系统调用来自未知的 exe 区域而不是 `ntdll.dll` 。
