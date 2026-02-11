@@ -195,16 +195,17 @@ RunSyscall:
     syscall
     ret
 ```
-这一部分写在代码区，我们定义了两个函数，首先是SetSSN，他把EAX中的参数传入我们刚刚申请的wSystemCall地址。
-根据 Windows x64 Calling Convention (调用约定)，函数的**第 1 个整数参数** 永远存放在 **RCX** 寄存器中。因为SSN只占32位，所以我们使用RCX的下半位ECX即可
+这一部分写在代码区，我们定义了两个函数，首先是SetSSN，他把ECX中的参数传入我们刚刚申请的wSystemCall地址。
+根据 Windows x64 Calling Convention (调用约定)，函数的**第 1 个整数参数** 永远存放在 **RCX** 寄存器中。因为SSN只占32位，所以我们使用RCX的半位ECX即可
 - **`[rip + wSystemCall]`**：这是 **RIP 相对寻址**。
     - 它告诉 CPU：“以当前指令的位置 (RIP) 为基准，根据偏移量找到 `wSystemCall` 变量的内存地址。”
-最后好似RunSyscall，这个函数是不是看起来很熟悉，这正是之前我们根据NtOpenProcess地址打印出来的机器码对应的汇编函数，我们将它还原了。
+最后是RunSyscall，这个函数是不是看起来很熟悉，这正是之前我们根据NtOpenProcess地址打印出来的机器码对应的汇编函数，我们将它还原了。（有意思的是地一个mov，把rcx的值放进r10,这是cpu的备份，因为要把下一条要执行的命令的地址放进rcx，所以需要提前把rcx中的参数备份到r10以防丢失）。
 
 这段汇编的精髓就在于，他是一把枪，你只要查询ms文档，在c代码中构建好参数，你可以通过这把枪调用任何函数，这是后续开发的基础。
 
 
 ==至此，我们成功完成了Halo's Gate逻辑链的完整构建。==
+
 ==**"Yeah, we happy."** _(Vincent Vega, Pulp Fiction)_==
 
 ps:
