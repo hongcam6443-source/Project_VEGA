@@ -1,4 +1,3 @@
-//注意，我不会使用单一函数名匹配的逻辑，而是将ntdll.dll中所有函数的函数名hash和地址导出并存入全局结构体数组
 #include <windows.h>
 #include <winternl.h>
 #include <stdio.h>
@@ -95,6 +94,38 @@ typedef struct _API_ENTRY{
 API_ENTRY ApiTable[MAX_API_COUNT];
 int ApiCount = 0; // 当前收录了多少个 API
 
+//!!!精髓，Halo‘s Gate逻辑
+//定义一个用来判断的辅助函数(这里我写反向判断逻辑是因为反向判断更快)
+BOOL IsClean(BYTE* address){
+    if(address[0] != 0x4c || address[1] != 0x8b || address[2] != 0xD1 || address[3] != 0xB8){
+        return FALSE;
+    }
+    else{
+        return TRUE;
+    }
+}
+DWORD GetSSN(PVOID FunctionAddress){
+    BYTE* pByte = (BYTE*)FunctionAddress;
+
+    //先检查自己是否纯净
+    if(IsClean(pByte)){
+        return ((pByte[5] << 8) | pByte[4]); // 利用小端序（Little Endian）逻辑，将内存中的高位字节左移并与低位字节合并，重组还原出完整的 16 位系统调用号 (SSN)。 
+    }
+    //双向搜索逻辑，最大搜索数设置为前后各32
+    for(int i=1; i<=32; i++){
+        //向后搜索
+        BYTE* pDown = pByte + (i*32);
+        if(IsClean(pDown)){
+            return (((pDown[5] << 8) | pDown[4]) - i);
+        }
+        //向前搜索
+        BYTE* pUp = pByte - (i*32);
+        if(IsClean(pUp)){
+            return (((pUp[5] << 8) | pUp[4]) + i);
+        }
+    }
+    return -1; //啥也没有
+}
 
 //核心，手动解析导出表，查找函数地址
 void InitApiTable(PVOID DllBase){
@@ -153,6 +184,18 @@ PVOID GetApi(DWORD TargetHash){
     return NULL;
 }
 
+//引入我们写的汇编函数
+// 这是一个通用的函数指针定义，为了让编译器知道 RunSyscall 可以接受一堆参数
+extern void SetSSN(DWORD ssn);
+extern NTSTATUS RunSyscall(
+    PHANDLE ProcessHandle, 
+    ACCESS_MASK DesiredAccess, 
+    POBJECT_ATTRIBUTES ObjectAttributes, 
+    PCLIENT_ID ClientId
+);
+
+
+
 int main(){
     printf("[*] Walker Initializing...\n");
 
@@ -201,6 +244,37 @@ int main(){
                 PVOID pNtOpenProcess = GetApi(0x5003c058);
                 if (pNtOpenProcess){
                     printf("[!!!] NtOpenProcess Found : 0x%p\n", pNtOpenProcess);
+                    //!!!提取SSN
+                    DWORD ssn = GetSSN(pNtOpenProcess);
+                    if(ssn != -1){
+                        printf("[!!!] SSN Extracted: 0x%x (Decimal: %d)\n", ssn, ssn);
+
+                        //!!!加入一个试验性的攻击逻辑
+                        printf("[*] Preparing to invoke syscall...\n");
+                        //将ssn装填进汇编层
+                        SetSSN(ssn);
+                        //准备参数
+                        HANDLE hProcess = NULL;
+                        OBJECT_ATTRIBUTES oa;
+                        InitializeObjectAttributes(&oa, NULL, 0, NULL, NULL);
+                        CLIENT_ID cid;
+                        cid.UniqueProcess = (HANDLE)GetCurrentProcessId();
+                        cid.UniqueThread = 0;
+                        //开火
+                        NTSTATUS status = RunSyscall(&hProcess, PROCESS_ALL_ACCESS, &oa, &cid);
+                        printf("[*] Syscall executed.\n");
+                        printf("--> NTSTATUS: 0x%x\n", status);
+                        if(status == 0x00000000 && hProcess != NULL){
+                            printf("[+] SUCCESS!! Handle acquired: 0x%p\n", hProcess);
+                            CloseHandle(hProcess);//用完即关，保持优雅
+                        }else{
+                            printf("[-] Failed...");
+                        }
+                    }
+                    else{
+                        printf("[-] Failed to extract SSN\n");
+                        printf("Forget about the little difference? Go check it you asshole!");
+                    }
                 }
                 else{
                     printf("[-] Hash Not Found...\n");
@@ -217,4 +291,5 @@ int main(){
     getchar();
     return 0;
 
-}//编译指令：x86_64-w64-mingw32-gcc eat_resolution.c -o ghost_walker_v2.exe -static -w
+}
+//编译指令：x86_64-w64-mingw32-gcc syscaller.c gate.s -o halo_gate_final.exe -static -w

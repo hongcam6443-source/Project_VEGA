@@ -1,7 +1,7 @@
-# **What is Halo's Gate**
+# ==**What is Halo's Gate**==
 Halo's Gate 是一种高级的 EDR（Endpoint Detection and Response，终端检测与响应）绕过技术，旨在实现ring3（用户层）的静态隐匿。
 
-# **Why Halo‘s Gate**
+# ==**Why Halo‘s Gate**==
 有关EDR的进化以及与之对应的绕过技术，事实上是一场相当持久的博弈，这里只介绍最经典的几个阶段：
 ## **一. The IAT Evasion (隐藏导入表) ...**
 最初，EDR会对敏感的API调用设置hook，比如VirtualAlloc。在通常情况下，一个程序的函数调用过程是这样的：
@@ -42,7 +42,7 @@ EDR 更狠了，它不仅挂了 hook，还把前几个字节彻底改写：比�
 
 
 
-# Let's do it！！！(Step by step)
+# ==Let's do it！！！(Step by step)==
 （本部分会补充说明部分windows的内部设计细节， 但默认你有c语言的基础知识）
 ## **一.PEB遍历**
 我们的遍历逻辑链条是这样的：
@@ -95,3 +95,121 @@ Ldr是一个指针，指向下一层级（PEB_LDR_DATA）。
     - _Halo's Gate 的目标:_ 解析这个表，找到被 EDR (Endpoint Detection and Response, 端点检测与响应) 挂钩（Hook）之前的原始函数地址或系统调用号。
 2. **Import Directory (导入目录):** 你的程序用它来记录：“我需要调用 `kernel32.dll` 里的 `WriteFile`”。
 
+了解PE结构让我们能够找到EAT，现在的问题是如何从EAT中获取我们需要的函数信息，这里补充EAT的结构：
+在<winnt.h>中，他的定义结构如下（精简版）：
+```
+typedef struct _IMAGE_EXPORT_DIRECTORY {
+    DWORD   Characteristics;
+    DWORD   TimeDateStamp;
+    WORD    MajorVersion;
+    WORD    MinorVersion;
+    DWORD   Name;                 // DLL 名字的 RVA (比如指向 "ntdll.dll" 字符串)
+    DWORD   Base;                 // 序号的起始值 (通常是 1)
+    DWORD   NumberOfFunctions;    // 导出函数的总数量
+    DWORD   NumberOfNames;        // 导出“名字”的总数量 (我们循环的次数)
+    
+    // ▼▼▼▼▼▼ 三大金刚 (The Three Musketeers) ▼▼▼▼▼▼
+    DWORD   AddressOfFunctions;     // [数组 RVA] 指向函数地址表 (EAT)
+    DWORD   AddressOfNames;         // [数组 RVA] 指向函数名表 (ENT)
+    DWORD   AddressOfNameOrdinals;  // [数组 RVA] 指向序号表 (EOT)
+} IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
+```
+要通过函数名比如NtOpenProcess的哈系来遍历信息，主要是通过三大数组实现的，他们的逻辑如下：
+1. **AddressOfNames (名字表)**:
+    - 这是一个 `DWORD` 数组。
+    - 里面存的全是 **RVA**，指向一个个字符串（函数名，如 "NtOpenProcess"）。
+    - **我们的任务**：在这里遍历，计算哈希，直到找到目标。
+2. **AddressOfNameOrdinals (序号表)**:
+    - **注意！** 这是一个 **`WORD` (2字节)** 数组，不是 `DWORD`！
+    - 它是“名字表”和“地址表”之间的**桥梁**。
+    - 如果我们在“名字表”的第 **`i`** 个位置找到了 "NtOpenProcess"，我们就去“序号表”的第 **`i`** 个位置拿数据。
+    - 拿到的数据（我们叫它 `Ordinal`），就是函数在“地址表”里的**索引**。
+3. **AddressOfFunctions (地址表)**:
+    - 这是一个 `DWORD` 数组。
+    - 里面存的是函数的 **RVA**（代码的起始位置）。
+    - 我们用刚才拿到的 `Ordinal` 作为下标去取值：`AddressOfFunctions[Ordinal]`。
+
+搞清楚这个逻辑我们就可以加入EAT的解析逻辑并且拿到函数的真实地址，详细代码参考：
+[[halos_gate/codes/eat_resolution.c]]
+以下是在windows10professional上的运行结果：
+![](pics/ghost_walker_v2.png)
+**The Rayale with cheese...**(Vincent Vega, Pulp Fiction)
+## 三.提取SSN
+现在我们已经掌握了ntdll.dll中所有函数的地址，但是，如果我们直接调用这个api发起syscall，依然会被hook住，我们必须要拿到函数构造中的SSN值，并手动构造汇编来发起syscall。而这一步：提取SSN，正是Halo's Gate的精髓所在。
+记得我之前提到过得“The little difference”吗，hacker不相信硬编码，我们写一个小的debug逻辑亲自看看内存里面的syscall stub到底长什么样，在代码中已经找到NtOpenProcess地址之后加上一下逻辑：
+```
+//debug：打印前32个字节的机器码
+printf("\n[DEBUG] Inspecting Memory at 0x%p\n", pNtOpenProcess);
+unsigned char* pByte = (unsigned char*)pNtOpenProcess;
+
+for(int i=0; i<32; i++){
+printf("%02x", pByte[i]);
+if((i+1)%16 == 0){
+printf("\n");
+} //每16字节换行
+}
+```
+运行结果如下：
+![](pics/debug.png)
+这是 **未被污染的原始机器码**。
+- `4c 8b d1` = `mov r10, rcx` (为 syscall 做准备，备份)
+- `b8` = `mov eax, ...` (把 SSN 放入累加器)
+- **`26 00 00 00`** = **这就是我们要找的 SSN (0x26)**
+这既值得高兴也是个意外，没有污染意味这我们可以直接使用Hell's Gate提取SSN。不过，我们不能幻想任何一台机器都没有安装先进EDR，我们假设他已经被污染了，并且手动加上Halo’s Gate的上下求索逻辑，具体代码请参考：
+[[halos_gate/codes/ssn_extraction.c]]
+运行结果如下：
+![](pics/ghost_walker_v3.png)
+_"The path of the righteous man has been set on all sides by the inequities of the selfish and the tyranny of evil men."_  —— _Ezekiel 25:17_
+
+## 四.内联汇编，发起系统调用
+我们要写一个外部汇编文件，模仿系统调用指令。并在原脚本中设定参数，调用汇编，拿返回值。具体代码参考：
+[[halos_gate/codes/syscaller.c]]
+[[halos_gate/codes/gate.s]]
+运行结果如下：
+![](pics/halo_gate_final.png)
+我们来仔细解析一下这个汇编文件：
+
+```
+.intel_syntax noprefix
+.global SetSSN
+.global RunSyscall
+```
+这一部分主要是语法申明，将我们汇编里面的两个函数公开，供c脚本调用
+
+```
+.data
+    wSystemCall: .long 0
+```
+这一部分实在内存的data段申请了一块区域存放SSH， long 0等价于DWORD或者int，都是4byte。
+
+```
+.text
+SetSSN:
+    xor eax, eax
+    mov dword ptr [rip + wSystemCall], ecx
+    ret
+
+RunSyscall:
+    mov r10, rcx
+    mov eax, dword ptr [rip + wSystemCall]
+    syscall
+    ret
+```
+这一部分写在代码区，我们定义了两个函数，首先是SetSSN，他把EAX中的参数传入我们刚刚申请的wSystemCall地址。
+根据 Windows x64 Calling Convention (调用约定)，函数的**第 1 个整数参数** 永远存放在 **RCX** 寄存器中。因为SSN只占32位，所以我们使用RCX的下半位ECX即可
+- **`[rip + wSystemCall]`**：这是 **RIP 相对寻址**。
+    - 它告诉 CPU：“以当前指令的位置 (RIP) 为基准，根据偏移量找到 `wSystemCall` 变量的内存地址。”
+最后好似RunSyscall，这个函数是不是看起来很熟悉，这正是之前我们根据NtOpenProcess地址打印出来的机器码对应的汇编函数，我们将它还原了。
+
+这段汇编的精髓就在于，他是一把枪，你只要查询ms文档，在c代码中构建好参数，你可以通过这把枪调用任何函数，这是后续开发的基础。
+
+
+==至此，我们成功完成了Halo's Gate逻辑链的完整构建。==
+==**"Yeah, we happy."** _(Vincent Vega, Pulp Fiction)_==
+
+ps:
+目前Halo‘s Gate 主题还有两个方向需要完善：
+1.整合一个完整的初级恶意脚本，展示Halo’s Gate在具体的恶意功能实现中的调用逻辑
+2.**Indirect Syscalls (间接系统调用升级)**：
+- 目前的 `syscall` 指令是在我们自己的 `.exe` 里执行的。聪明的 EDR 会检查 `RIP` 指针，发现这个系统调用来自未知的 exe 区域而不是 `ntdll.dll` 。
+- **进阶**：跳回 `ntdll.dll` 里面去执行 `syscall` 指令，让调用栈看起来更“正规”。

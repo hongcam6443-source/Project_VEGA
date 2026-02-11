@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "0ea86674e31cb0fe",
+        "id": "2dd3a879ffabf70e",
         "type": "tabs",
         "children": [
           {
-            "id": "7b3f3aa70aa94017",
+            "id": "ee3275a20e7435fa",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -183,16 +183,25 @@
       "bases:新建数据库": false
     }
   },
-  "active": "7b3f3aa70aa94017",
+  "active": "ee3275a20e7435fa",
   "lastOpenFiles": [
-    "halos_gate/codes/eat_resolution.c",
-    "halos_gate/codes/export_table_resolution.c",
-    "halos_gate/codes/mmm.exe",
-    "halos_gate/codes/1.c",
-    "halos_gate/pics/ghost_walker.png",
+    "README.md",
     "halos_gate/Halo's Gate.md",
-    "halos_gate/codes/ghost_walker.exe",
-    "halos_gate/pics",
-    "README.md"
+    "halos_gate/pics/halo_gate_final.png",
+    "halos_gate/codes/halo_gate_final.exe",
+    "halos_gate/codes/1.c",
+    "halos_gate/codes/syscaller.c",
+    "halos_gate/codes/1.s",
+    "halos_gate/codes/gate.s",
+    "halos_gate/codes/ghost_walker_v3.exe",
+    "halos_gate/pics/ghost_walker_v3.png",
+    "halos_gate/pics/debug.png",
+    "halos_gate/codes/debug.exe",
+    "halos_gate/codes/ghost_walker_v2.exe",
+    "halos_gate/codes/ssn_extraction.c",
+    "halos_gate/pics/ghost_walker_v2.png",
+    "codes/eat_resolution.x.md",
+    "codes",
+    "halos_gate/pics/ghost_walker.png"
   ]
 }
