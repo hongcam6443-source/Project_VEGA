@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "halos_gate/Halo's Gate.md",
+                "file": "halos_gate/to do list.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Halo's Gate"
+              "title": "to do list"
             }
           }
         ]
@@ -185,8 +185,9 @@
   },
   "active": "ee3275a20e7435fa",
   "lastOpenFiles": [
-    "README.md",
     "halos_gate/Halo's Gate.md",
+    "halos_gate/to do list.md",
+    "README.md",
     "halos_gate/pics/halo_gate_final.png",
     "halos_gate/codes/halo_gate_final.exe",
     "halos_gate/codes/1.c",
