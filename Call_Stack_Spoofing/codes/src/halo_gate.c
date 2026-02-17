@@ -19,8 +19,8 @@ static int ApiCount = 0;
 // 辅助函数实现
 // ==========================================
 
-// ASCII Hash (私有，因为只有 InitApiTable 用)
-static DWORD djb2_hash_a(char* str) {
+// ASCII Hash (公开)
+DWORD djb2_hash_a(char* str) {
     unsigned long hash = 5381;
     int c;
     while (c = *str++) {
