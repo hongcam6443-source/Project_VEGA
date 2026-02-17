@@ -27,30 +27,28 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Call_Stack_Spoofing/Call Stack Spoofing.md",
+                "file": "ETW_Bliding/ETW_Blinding.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Call Stack Spoofing"
+              "title": "ETW_Blinding"
             }
           },
           {
             "id": "845449e619b66d53",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "image",
               "state": {
-                "file": "README.md",
-                "mode": "source",
-                "source": false
+                "file": "ETW_Bliding/pics/etw_blinding.png"
               },
-              "icon": "lucide-file",
-              "title": "README"
+              "icon": "lucide-image",
+              "title": "etw_blinding"
             }
           }
         ],
-        "currentTab": 2
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -212,12 +210,17 @@
       "bases:新建数据库": false
     }
   },
-  "active": "845449e619b66d53",
+  "active": "d64a29518ccb15d8",
   "lastOpenFiles": [
-    "halos_gate/to do list.md",
-    "README.md",
-    "Strategic Blueprint.md",
     "Call_Stack_Spoofing/Call Stack Spoofing.md",
+    "ETW_Bliding/pics/etw_blinding.png",
+    "ETW_Bliding/ETW_Blinding.md",
+    "Call_Stack_Spoofing/codes/niemand.exe",
+    "ETW_Bliding/pics",
+    "README.md",
+    "ETW_Bliding",
+    "halos_gate/to do list.md",
+    "Strategic Blueprint.md",
     "Call_Stack_Spoofing/pics/callStackSpoofing.png",
     "Call_Stack_Spoofing/pics/golem_gadget.png",
     "Call_Stack_Spoofing/pics",
@@ -225,18 +228,15 @@
     "未命名.md",
     "halos_gate/codes_bak/golem_walker.exe",
     "halos_gate/codes_bak/src/1.c",
-    "halos_gate/Halo's Gate.md",
+    "Halos_Gate/Halo's Gate.md",
     "halos_gate/codes_bak/include/spoof.h",
     "halos_gate/codes_bak/src/spoof.c",
     "halos_gate/codes_bak/include/halo_gate.h",
-    "halos_gate/codes_bak/src/halo_gate.c",
-    "halos_gate/codes_bak/halo_gate.exe",
-    "halos_gate/codes_bak/src/hades_utils.c",
-    "halos_gate/pics/halo_gate_final.png",
-    "halos_gate/pics/ghost_walker_v3.png",
-    "halos_gate/pics/debug.png",
-    "halos_gate/pics/ghost_walker_v2.png",
+    "Halos_Gate/pics/halo_gate_final.png",
+    "Halos_Gate/pics/ghost_walker_v3.png",
+    "Halos_Gate/pics/debug.png",
+    "Halos_Gate/pics/ghost_walker_v2.png",
     "codes/eat_resolution.x.md",
-    "halos_gate/pics/ghost_walker.png"
+    "Halos_Gate/pics/ghost_walker.png"
   ]
 }

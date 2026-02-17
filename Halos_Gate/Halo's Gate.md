@@ -68,9 +68,9 @@ Ldr是一个指针，指向下一层级（PEB_LDR_DATA）。
      `BaseDllName` (名字，即 "ntdll.dll")
  我们要做的：遍历链表，拿出档案，看名字，取基址。
 
-具体代码实现参考[[halos_gate/codes/peb_walkthrough_manual.c]]
+具体代码实现参考[[codes/peb_walkthrough_manual.c]]
 这是在window10professional上的运行结果：
-![[ghost_walker.png]]
+![[pics/ghost_walker.png]]
 **Check out the big brain!**(Jules, Pulp Fiction)
 
 ## **二.Export Table解析**
@@ -130,7 +130,7 @@ typedef struct _IMAGE_EXPORT_DIRECTORY {
     - 我们用刚才拿到的 `Ordinal` 作为下标去取值：`AddressOfFunctions[Ordinal]`。
 
 搞清楚这个逻辑我们就可以加入EAT的解析逻辑并且拿到函数的真实地址，详细代码参考：
-[[halos_gate/codes/eat_resolution.c]]
+[[codes/eat_resolution.c]]
 以下是在windows10professional上的运行结果：
 ![](pics/ghost_walker_v2.png)
 **The Rayale with cheese...**(Vincent Vega, Pulp Fiction)
@@ -156,15 +156,15 @@ printf("\n");
 - `b8` = `mov eax, ...` (把 SSN 放入累加器)
 - **`26 00 00 00`** = **这就是我们要找的 SSN (0x26)**
 这既值得高兴也是个意外，没有污染意味这我们可以直接使用Hell's Gate提取SSN。不过，我们不能幻想任何一台机器都没有安装先进EDR，我们假设他已经被污染了，并且手动加上Halo’s Gate的上下求索逻辑，具体代码请参考：
-[[halos_gate/codes/ssn_extraction.c]]
+[[codes/ssn_extraction.c]]
 运行结果如下：
 ![](pics/ghost_walker_v3.png)
 _"The path of the righteous man has been set on all sides by the inequities of the selfish and the tyranny of evil men."_  —— _Ezekiel 25:17_
 
 ## 四.内联汇编，发起系统调用
 我们要写一个外部汇编文件，模仿系统调用指令。并在原脚本中设定参数，调用汇编，拿返回值。具体代码参考：
-[[halos_gate/codes/syscaller.c]]
-[[halos_gate/codes/gate.s]]
+[[codes/syscaller.c]]
+[[codes/gate.s]]
 运行结果如下：
 ![](pics/halo_gate_final.png)
 我们来仔细解析一下这个汇编文件：

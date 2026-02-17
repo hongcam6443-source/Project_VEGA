@@ -51,6 +51,7 @@ typedef struct _HALO_ENTRY {
 
 // 工具类
 DWORD djb2_hash(WCHAR* str);
+DWORD djb2_hash_a(char* str);
 
 // Halo Gate 核心功能
 void InitApiTable(PVOID DllBase);
