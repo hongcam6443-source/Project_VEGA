@@ -5,6 +5,9 @@
 #include <windows.h>
 #include <winternl.h>
 #include <stdio.h>
+#include <winternl.h>
+
+typedef struct _CLIENT_ID *PCLIENT_ID;
 
 // ==========================================
 // 1. 结构体定义(均为简化版本)

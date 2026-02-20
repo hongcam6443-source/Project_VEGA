@@ -2,6 +2,10 @@
 #include "halo_gate.h"
 #include "spoof.h"
 #include <intrin.h> // for __readgsqword
+#include <winternl.h>
+#ifndef PCLIENT_ID
+typedef CLIENT_ID *PCLIENT_ID;
+#endif
 
 #define NTDLL_HASH 0x22d3b5ed
 
@@ -13,10 +17,7 @@ extern NTSTATUS SpoofedSyscall();
 
 // 必须的底层结构体定义
 
-typedef struct _CLIENT_ID {
-    HANDLE UniqueProcess;
-    HANDLE UniqueThread;
-} CLIENT_ID, *PCLIENT_ID;
+
 
 // 1. 万能签名：使用变参宏完美匹配 x64 ABI 的底层调用约定
 typedef NTSTATUS (NTAPI* fnUniversalSpoof)(PVOID FirstArg, ...);

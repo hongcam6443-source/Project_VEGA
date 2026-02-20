@@ -20,3 +20,15 @@ rad.json
 *.flf
 #Test results file
 TestResults.xml
+# Executables
+*.exe
+*.dll
+# Debug symbols & Cache
+*.pdb
+*.ilk
+*.obj
+*.o
+# VS Code Metadata
+.vscode/
+# Local build scripts if they contain sensitive paths
+build.bat
