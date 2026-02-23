@@ -1,70 +1,18 @@
-### 📄 Project README: The Five Strategic Quadrants of Evasion
+# 🎯 PROJECT: VEGA
+**Objective**: A low-level Windows in-process stealth framework in C, focusing on EDR evasion via direct syscalls, memory manipulation, and telemetry disruption.
+**Environment**: Kali Linux (Cross-compile) / Windows 11 Physical Machine (with Windows 10 VM).
 
-The project is divided into five strategic quadrants of evasion, designed to completely bypass Windows **Ring 3**  and **Ring 0**  security boundaries.
+## 1. CURRENT VECTOR (Completed Operations & Mechanics)
+- [x] **Halo's Gate + Indirect Syscall**: Implemented via manual parsing of the `ntdll.dll` PE headers in memory to dynamically resolve syscall numbers, bypassing user-land hooks, and executing them through legitimate `ntdll` memory addresses to spoof the call source.
+- [x] **Call Stack Spoofing**: Achieved by parsing the `.pdata` section (Exception Directory) of legitimate modules to dynamically locate valid ROP gadgets, reconstructing a synthetic, legitimate-looking call frame prior to the syscall execution.
+- [x] **ETW Blinding**: Executed via direct memory overwrite (patching) of the corresponding Event Tracing for Windows (ETW) functions (e.g., `EtwEventWrite`) to silence user-mode telemetry generation.
 
-**I. Execution (The Walk)**
+## 2. ACTIVE ROADBLOCKS (Tactical Bottlenecks)
+- **The PIC Dependency Hell**: Attempting cross-process operations (Process Hollowing/Module Stomping) introduced exponential code redundancy and unmanageable Position-Independent Code (PIC) assembly requirements.
+- **The Anomaly of Perfection**: Bypassing all user-land hooks for high-level APIs (like `WinHTTP`) creates a behavioral "black hole." EDRs view the absolute absence of telemetry during a network connection as a critical red flag.
 
-- **Module:** Halo's Gate
-    
-- **Status:** 🟢 **Integrated & Active**
-    
-- **Concept:** _"Walk the earth without leaving footprints."_ 
-    
-- **Tech:** Dynamic Syscall Resolution & Indirect Syscall Execution.
-    
-- **Goal:** Bypass user-land **API** (Application Programming Interface，应用程序编程接口) hooks (ntdll.dll) and execute logic without triggering **EDR** (Endpoint Detection and Response，终端检测与响应系统) sensors.
-    
-
-**II. Stealth (The Silence)**
-
-- **Module:** Rootkit
-    
-- **Status:** 🟡 **In Dev**
-    
-- **Concept:** _"If the list says you're not there, you're not there."_ 
-    
-- **Tech:** **DKOM** (Direct Kernel Object Manipulation). Unlinking processes from `ActiveProcessLinks` and hiding driver objects.
-    
-- **Goal:** Total invisibility from the **OS**  process list and handle tables.
-    
-
-**III. Legitimacy (The Suit)**
-
-- **Module:** Call Stack Spoofer
-    
-- **Status:** 🟢 **Integrated with Execution**
-    
-- **Concept:** _"Wear a suit. Blend in. Look like you belong."_ 
-    
-- **Tech:** Call Stack Spoofing & Module Stomping.
-    
-- **Goal:** Masking unbacked memory (floating code) to look like legitimate file-backed modules. Avoiding heuristic detection based on anomalous return addresses. _Seamlessly chained with Halo's Gate to forge a perfect starlight origin for our wormhole jumps._
-    
-
-**IV. Blinding (The Cleaner)**
-
-- **Module:** ETW / Callback Patcher
-    
-- **Status:** 🔴 **Pending**
-    
-- **Concept:** _"No witnesses. Call Winston Wolf."_ 
-    
-- **Tech:** **ETW** (Event Tracing for Windows) Patching & Kernel Callback Removal.
-    
-- **Goal:** Neutralizing the system's ability to report events (**Telemetry**) to security controllers.
-    
-
-**V. Mutation (The Evolution)**
-
-- **Module:** Polymorphic Engine
-    
-- **Status:** 🔴 **Pending**
-    
-- **Concept:** _"Personality goes a long way."_ 
-    
-- **Tech:** **Polymorphism**  & **Metamorphic Code**  & **IAT Obfuscation**.
-    
-- **Goal:** Ensure every generated **Payload**  has a unique cryptographic hash and execution fingerprint, rendering signature-based static analysis completely useless.
-    
-
-🏴 **Disclaimer:** Research Purposes Only. This code is a study of system internals and security boundaries. The authors are not responsible for any misuse.
+## 3. COMMANDER DIRECTIVES (Strategic Memory)
+- **Tactical Downgrade (In-Process Only)**: Abandon cross-process injection. VEGA must operate as a standalone, self-contained in-process framework to maximize developer sanity and execution stability.
+- **The "Good Citizen" Camouflage**: Stop trying to be completely invisible on the network layer. Accept standard EDR API hook scrutiny for network calls, but utilize traffic shaping and timing jitter to blend in with legitimate system noise.
+- **Zero Script-Kiddie Payloads**: Absolute prohibition of MSFvenom or other heavily signature-based payloads. 
+- **Core Philosophy**: "Perfection is the enemy of execution in cyber warfare. We don't build invisible ghosts; we build anomalies that are too expensive for the Blue Team to analyze."
